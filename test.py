@@ -36,6 +36,29 @@ def torch2jax(dataloader: DataLoader):
         yield (tuple(jnp.array(v.numpy()) for v in example))
 
 
+def print_header():
+    header_msg = (
+        f"{'Epoch':>5} :: {'Loss (Train)':>16} :: "
+        f"{'Loss (Val)':>16} :: {'Loss (Test)':>16} :: {'Best (Val)':>16}"
+    )
+
+    print(header_msg)
+    print("=" * len(header_msg))
+
+
+def print_losses(
+    epoch: int,
+    train: float,
+    val: float,
+    test: float,
+    best_val_yet: float,
+):
+    print(
+        f"{epoch + 1:>5d} :: {train:>16e} :: {val:>16e} :: "
+        f"{test:>16e} :: {best_val_yet:>16e}"
+    )
+
+
 def main():
     ap = ArgumentParser()
     ap.add_argument("load_path", type=str, help="Path to trajectory dataset")
@@ -69,14 +92,28 @@ def main():
 
     state = optim.init(equinox.filter(model, equinox.is_inexact_array))
 
+    print_header()
+    print_losses(
+        0,
+        evaluate(train_dl, model),
+        evaluate(val_dl, model),
+        evaluate(test_dl, model),
+        0.0,
+    )
+
     for epoch in range(TRAIN_CONFIG["n_epochs"]):
-        train_loss = 0.0
         for x0, y, rnn_input, tau, lens in torch2jax(train_dl):
-            model, state, batch_loss = train_step(
+            model, state, _ = train_step(
                 model, (x0, rnn_input, tau, lens), y, optim, state
             )
-            train_loss += batch_loss
-        print(f"{epoch + 1}:: {train_loss / len(train_dl)}")
+
+        print_losses(
+            epoch + 1,
+            evaluate(train_dl, model),
+            evaluate(val_dl, model),
+            evaluate(test_dl, model),
+            0.0,
+        )
 
     x0 = torch.tensor([1.0, 1.0])
     u = torch.randn((31, 1))
@@ -95,11 +132,18 @@ def main():
     plt.show()
 
 
-Inputs = tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
+Inputs = tuple[jax.Array, jax.Array, jax.Array, jax.Array]
 
 
-@equinox.filter_value_and_grad
-def compute_loss(model: Flumen, inputs: Inputs, y: jnp.ndarray):
+def evaluate(dataloader: DataLoader, model: Flumen) -> float:
+    total_loss = 0.0
+    for x0, y, rnn_input, tau, lens in torch2jax(dataloader):
+        total_loss += compute_loss(model, (x0, rnn_input, tau, lens), y).item()
+    return total_loss / len(dataloader)
+
+
+@equinox.filter_jit
+def compute_loss(model: Flumen, inputs: Inputs, y: jax.Array):
     x, rnn_input, tau, batch_lens = inputs
     y_pred = model(x, rnn_input, tau, batch_lens)
     loss_val = jnp.mean(jnp.square(y - y_pred))
@@ -111,11 +155,11 @@ def compute_loss(model: Flumen, inputs: Inputs, y: jnp.ndarray):
 def train_step(
     model: Flumen,
     inputs: Inputs,
-    y: jnp.ndarray,
+    y: jax.Array,
     optimiser: optax.GradientTransformation,
     state: optax.OptState,
 ) -> tuple[Flumen, optax.OptState, jax.Array]:
-    loss, grad = compute_loss(model, inputs, y)
+    loss, grad = equinox.filter_value_and_grad(compute_loss)(model, inputs, y)
     update, new_state = optimiser.update(grad, state, cast(optax.Params, model))
     model = equinox.apply_updates(model, update)
 

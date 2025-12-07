@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 import pickle
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 
@@ -30,7 +31,7 @@ TRAIN_CONFIG = {
 }
 
 
-def torch2jax(dataloader):
+def torch2jax(dataloader: DataLoader):
     for example in dataloader:
         yield (tuple(jnp.array(v.numpy()) for v in example))
 
@@ -81,7 +82,7 @@ def main():
     u = torch.randn((31, 1))
     times = torch.linspace(0.0, 15.0, 100).unsqueeze(-1)
     x0, rnn_input, tau, lengths = get_batch_inputs(
-        x0, times, u, train_data.delta, pack_inputs=False
+        x0, times, u, train_data.delta
     )
     x0 = jnp.array(x0.numpy())
     rnn_input = jnp.array(rnn_input.numpy())
@@ -94,12 +95,13 @@ def main():
     plt.show()
 
 
+Inputs = tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
+
+
 @equinox.filter_value_and_grad
-def compute_loss(model: Flumen, inputs, y):
+def compute_loss(model: Flumen, inputs: Inputs, y: jnp.ndarray):
     x, rnn_input, tau, batch_lens = inputs
-
     y_pred = model(x, rnn_input, tau, batch_lens)
-
     loss_val = jnp.mean(jnp.square(y - y_pred))
 
     return loss_val
@@ -107,20 +109,20 @@ def compute_loss(model: Flumen, inputs, y):
 
 @equinox.filter_jit
 def train_step(
-    model: equinox.Module,
-    inputs,
-    y,
+    model: Flumen,
+    inputs: Inputs,
+    y: jnp.ndarray,
     optimiser: optax.GradientTransformation,
     state: optax.OptState,
-) -> tuple[equinox.Module, optax.OptState, jax.Array]:
+) -> tuple[Flumen, optax.OptState, jax.Array]:
     loss, grad = compute_loss(model, inputs, y)
-    update, new_state = optimiser.update(grad, state, model)
+    update, new_state = optimiser.update(grad, state, cast(optax.Params, model))
     model = equinox.apply_updates(model, update)
 
     return model, new_state, loss
 
 
-def make_model(args: dict) -> Flumen:
+def make_model(args: dict[str, int]) -> Flumen:
     key = jrd.key(345098145)
 
     model = Flumen(

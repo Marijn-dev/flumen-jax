@@ -25,6 +25,7 @@ import pickle
 from pathlib import Path
 from typing import cast, Iterator
 import sys
+from time import time
 
 import matplotlib.pyplot as plt
 
@@ -40,6 +41,8 @@ TRAIN_CONFIG = {
     "sched_patience": 10,
     "sched_rtol": 1e-4,
     "sched_eps": 1e-8,
+    "es_patience": 20,
+    "es_atol": 5e-5,
     "torch_seed": 3520756,
 }
 
@@ -130,8 +133,15 @@ def main():
         atol=0.0,
     )
 
+    early_stop = MetricMonitor(
+        patience=TRAIN_CONFIG["es_patience"],
+        atol=TRAIN_CONFIG["es_atol"],
+        rtol=0.0,
+    )
+
     val_loss = evaluate(val_dl, model)
     lr_monitor.update(val_loss)
+    early_stop.update(val_loss)
 
     print_header()
     print_losses(
@@ -139,9 +149,10 @@ def main():
         evaluate(train_dl, model),
         val_loss,
         evaluate(test_dl, model),
-        lr_monitor.best_metric,
+        early_stop.best_metric,
     )
 
+    train_time = time()
     for epoch in range(TRAIN_CONFIG["n_epochs"]):
         for y, inputs in torch2jax(train_dl):
             model, state, _ = train_step(
@@ -153,6 +164,19 @@ def main():
             )
 
         val_loss = evaluate(val_dl, model)
+        stop = early_stop.update(val_loss)
+
+        print_losses(
+            epoch + 1,
+            evaluate(train_dl, model),
+            val_loss,
+            evaluate(test_dl, model),
+            early_stop.best_metric,
+        )
+
+        if stop:
+            print("Early stop.", file=sys.stderr)
+            break
 
         update_lr = lr_monitor.update(val_loss)
         if update_lr:
@@ -161,14 +185,8 @@ def main():
                 factor=TRAIN_CONFIG["sched_factor"],
                 eps=TRAIN_CONFIG["sched_eps"],
             )
-
-        print_losses(
-            epoch + 1,
-            evaluate(train_dl, model),
-            val_loss,
-            evaluate(test_dl, model),
-            lr_monitor.best_metric,
-        )
+    train_time = time() - train_time
+    print(f"Training took {train_time} sec.")
 
     x0 = torch.tensor([1.0, 1.0])
     u = torch.randn((31, 1))

@@ -1,57 +1,38 @@
-import torch
-from torch.utils.data import DataLoader
-
-from jax import random as jrd
+import pickle
+import sys
+from argparse import ArgumentParser
+from pathlib import Path
+from time import time
 
 import equinox
-import optax
-
+import torch
 import yaml
-
-from flumen_jax import Flumen
-from flumen_jax.train import (
-    torch2jax,
-    evaluate,
-    train_step,
-    MetricMonitor,
-    reduce_learning_rate,
-)
-
 from flumen import TrajectoryDataset
+from torch.utils.data import DataLoader
 
-from argparse import ArgumentParser
-import pickle
-from pathlib import Path
-import sys
-from time import time
-from typing import TypedDict
-import datetime
-import re
-
-
-class TrainConfig(TypedDict):
-    batch_size: int
-    feature_dim: int
-    encoder_hsz: int
-    decoder_hsz: int
-    learning_rate: float
-    n_epochs: int
-    sched_factor: int
-    sched_patience: int
-    sched_rtol: float
-    sched_eps: float
-    es_patience: int
-    es_atol: float
-    torch_seed: int
-
+from flumen_jax.train import (
+    MetricMonitor,
+    evaluate,
+    reduce_learning_rate,
+    torch2jax,
+    train_step,
+)
+from flumen_jax.utils import (
+    TrainConfig,
+    adam,
+    make_model,
+    prepare_model_saving,
+    print_header,
+    print_losses,
+)
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
-    "feature_dim": 16,
-    "encoder_hsz": 20,
-    "decoder_hsz": 20,
-    "learning_rate": 7e-4,
-    "n_epochs": 200,
+    "feature_dim": 64,
+    "encoder_hsz": 128,
+    "decoder_hsz": 128,
+    "learning_rate": 1e-3,
+    "n_epochs": 500,
     "sched_factor": 2,
     "sched_patience": 10,
     "sched_rtol": 1e-4,
@@ -59,57 +40,10 @@ TRAIN_CONFIG: TrainConfig = {
     "es_patience": 20,
     "es_atol": 5e-5,
     "torch_seed": 3520756,
+    "model_key_seed": 345098145,
 }
 
 torch.manual_seed(seed=TRAIN_CONFIG["torch_seed"])
-
-
-def print_header():
-    header_msg = (
-        f"{'Epoch':>5} :: {'Loss (Train)':>16} :: "
-        f"{'Loss (Val)':>16} :: {'Loss (Test)':>16} :: {'Best (Val)':>16}"
-    )
-
-    print(header_msg)
-    print("=" * len(header_msg))
-
-
-def print_losses(
-    epoch: int,
-    train: float,
-    val: float,
-    test: float,
-    best_val_yet: float,
-):
-    print(
-        f"{epoch + 1:>5d} :: {train:>16.5e} :: {val:>16.5e} :: "
-        f"{test:>16.5e} :: {best_val_yet:>16.5e}"
-    )
-
-
-@optax.inject_hyperparams
-def adam(learning_rate):
-    return optax.adam(learning_rate)
-
-
-def get_timestamp() -> str:
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    ts = now.strftime("%y%m%d_%H%M")
-
-    return ts
-
-
-def prepare_model_saving(names: list[str], outdir: Path):
-    first_name = names[0]
-    timestamp = get_timestamp()
-    full_name = "_".join([timestamp] + names)
-    full_name = re.sub("[^a-zA-Z0-9_-]", "_", full_name)
-
-    model_save_dir = Path(outdir / f"{first_name}/{full_name}")
-    model_save_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Writing to directory {model_save_dir}", file=sys.stderr)
-
-    return model_save_dir
 
 
 def main():
@@ -156,7 +90,7 @@ def main():
     with open(model_save_dir / "metadata.yaml", "w") as f:
         yaml.dump(model_metadata, f)
 
-    model = make_model(model_args)
+    model = make_model(model_args, TRAIN_CONFIG["model_key_seed"])
 
     optim = adam(TRAIN_CONFIG["learning_rate"])
     state = optim.init(equinox.filter(model, equinox.is_inexact_array))
@@ -224,22 +158,6 @@ def main():
             )
     train_time = int(time() - train_time)
     print(f"Training took {train_time} sec.")
-
-
-def make_model(args: dict[str, int]) -> Flumen:
-    key = jrd.key(345098145)
-
-    model = Flumen(
-        args["state_dim"],
-        args["control_dim"],
-        args["output_dim"],
-        args["feature_dim"],
-        args["encoder_hsz"],
-        args["decoder_hsz"],
-        key=key,
-    )
-
-    return model
 
 
 if __name__ == "__main__":

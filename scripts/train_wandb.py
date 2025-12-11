@@ -99,7 +99,7 @@ def main():
         project="flumen-jax", config=cast(dict, TRAIN_CONFIG), name=full_name
     )
     model_save_dir = make_model_dir(
-        Path(args.outdir), first_name, full_name + run.id
+        Path(args.outdir), first_name, full_name + "_" + run.id
     )
     model_name = f"flumen_jax-{timestamp}-{data_path.stem}-{run.id}"
 

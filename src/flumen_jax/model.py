@@ -48,6 +48,7 @@ class FlumenHead(equinox.Module):
             out_size=feature_dim,
             width_size=encoder_hsz,
             depth=2,
+            activation=jnp.tanh,
             key=enc_key,
         )
 
@@ -109,6 +110,7 @@ class FlumenTail(equinox.Module):
             out_size=output_dim,
             width_size=decoder_hsz,
             depth=2,
+            activation=jnp.tanh,
             key=key,
         )
 

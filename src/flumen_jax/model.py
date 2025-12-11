@@ -13,6 +13,7 @@ BatchedState = Float[Array, "batch state_dim"]
 Output = Float[Array, "output_dim"]
 BatchedOutput = Float[Array, "batch output_dim"]
 
+Input = Float[Array, "seq_len control_dim"]
 RNNInput = Float[Array, "seq_len control_dim+1"]
 BatchedRNNInput = Float[Array, "batch seq_len control_dim+1"]
 
@@ -63,6 +64,34 @@ class FlumenHead(equinox.Module):
         )
 
         return h_last, h_seq
+
+    def eval_trajectory(
+        self,
+        initial_state: State,
+        u: Input,
+        tau: Float[Array, "n_time_pts 1"],  # noqa: F722
+        skips: UInt[Array, "n_time_pts"],  # noqa: F821
+    ) -> tuple[RNNState, RNNState]:
+        h = self.encoder(initial_state)
+        c = jnp.zeros_like(h)
+
+        rnn_input_integer_steps = jnp.concatenate(
+            (u, jnp.ones((u.shape[0], 1))), axis=-1
+        )
+
+        (_, _), rnn_state_seq = jax.lax.scan(
+            lambda state, input: (self.cell(input, state), state),
+            (h, c),
+            rnn_input_integer_steps,
+        )
+
+        rnn_input_tau = jnp.concatenate((u[skips], tau), axis=-1)
+        h0 = rnn_state_seq[0][skips, :]
+        c0 = rnn_state_seq[1][skips, :]
+
+        h1, _ = jax.vmap(self.cell)(rnn_input_tau, (h0, c0))
+
+        return h0, h1
 
 
 class FlumenTail(equinox.Module):
@@ -128,6 +157,19 @@ class Flumen(equinox.Module):
             h_seq[jnp.arange(bs), batch_lens],
             h_last,
         )
+
+        y = jax.vmap(self.tail)(h0, h1, tau)
+
+        return y
+
+    def eval_trajectory(
+        self,
+        initial_state: State,
+        u: Input,
+        tau: Float[Array, "n_time_pts 1"],  # noqa: F722
+        skips: UInt[Array, "n_time_pts"],  # noqa: F821
+    ):
+        h0, h1 = self.head.eval_trajectory(initial_state, u, tau, skips)
 
         y = jax.vmap(self.tail)(h0, h1, tau)
 

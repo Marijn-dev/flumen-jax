@@ -1,4 +1,5 @@
 from jax import random as jrd
+from jax import numpy as jnp
 
 import equinox
 
@@ -19,11 +20,12 @@ from time import time
 from typing import cast
 
 
-def get_trajectory_inputs(t, delta):
-    skips = np.floor(t / delta).astype(np.uint32)
+@equinox.filter_jit
+def eval_trajectory(model: Flumen, t, x0, u, delta):
+    skips = jnp.floor(t / delta).astype(jnp.uint32)
     tau = (t - delta * skips) / delta
 
-    return tau, skips.squeeze()
+    return model.eval_trajectory(x0, u, tau, skips.squeeze())
 
 
 def parse_args():
@@ -103,13 +105,12 @@ def main():
     while True:
         time_integrate = time()
         x0, t, y, u = sampler.get_example(
-            time_horizon=time_horizon, n_samples=int(1 + 3 * time_horizon)
+            time_horizon=time_horizon, n_samples=int(1 + 20 * time_horizon)
         )
         time_integrate = time() - time_integrate
 
         time_predict = time()
-        tau, skips = get_trajectory_inputs(t, delta)
-        y_pred = equinox.filter_jit(model.eval_trajectory)(x0, u, tau, skips)
+        y_pred = eval_trajectory(model, t, x0, u, delta)
         time_predict = time() - time_predict
 
         print(f"Timings: {time_integrate}, {time_predict}")

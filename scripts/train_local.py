@@ -6,11 +6,10 @@ from time import time
 
 import equinox
 import jax
-from jax import random as jrd
-import torch
+import numpy as np
 import yaml
 from flumen import TrajectoryDataset
-from torch.utils.data import DataLoader
+from jax import random as jrd
 
 from flumen_jax.train import (
     MetricMonitor,
@@ -28,12 +27,13 @@ from flumen_jax.utils import (
     print_header,
     print_losses,
 )
+from flumen_jax.dataloader import NumPyLoader, NumPyDataset
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
-    "feature_dim": 24,
-    "encoder_hsz": 128,
-    "decoder_hsz": 128,
+    "feature_dim": 16,
+    "encoder_hsz": 16,
+    "decoder_hsz": 16,
     "learning_rate": 1e-3,
     "n_epochs": 500,
     "sched_factor": 2,
@@ -42,11 +42,11 @@ TRAIN_CONFIG: TrainConfig = {
     "sched_eps": 1e-8,
     "es_patience": 20,
     "es_atol": 5e-5,
-    "torch_seed": 3520756,
+    "numpy_seed": 3520756,
     "model_key_seed": 345098145,
 }
 
-torch.manual_seed(seed=TRAIN_CONFIG["torch_seed"])
+np.random.seed(TRAIN_CONFIG["numpy_seed"])
 
 
 def main():
@@ -63,14 +63,14 @@ def main():
     with data_path.open("rb") as f:
         data = pickle.load(f)
 
-    train_data = TrajectoryDataset(data["train"])
-    val_data = TrajectoryDataset(data["val"])
-    test_data = TrajectoryDataset(data["test"])
+    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
+    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
+    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
 
     bs = TRAIN_CONFIG["batch_size"]
-    train_dl = DataLoader(train_data, batch_size=bs, shuffle=True)
-    val_dl = DataLoader(val_data, batch_size=bs, shuffle=True)
-    test_dl = DataLoader(test_data, batch_size=bs, shuffle=True)
+    train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
+    val_dl = NumPyLoader(val_data, batch_size=bs, shuffle=False)
+    test_dl = NumPyLoader(test_data, batch_size=bs, shuffle=False)
 
     model_args = {
         "state_dim": train_data.state_dim,
@@ -129,7 +129,7 @@ def main():
 
     train_time = time()
     for epoch in range(TRAIN_CONFIG["n_epochs"]):
-        for y, inputs in torch2jax(train_dl):
+        for y, inputs in train_dl:
             model, state, _ = train_step(
                 model,
                 inputs,

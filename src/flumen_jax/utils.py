@@ -23,7 +23,7 @@ class TrainConfig(TypedDict):
     sched_eps: float
     es_patience: int
     es_atol: float
-    torch_seed: NotRequired[int]
+    numpy_seed: NotRequired[int]
     model_key_seed: NotRequired[int]
 
 

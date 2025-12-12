@@ -6,16 +6,19 @@ import jax
 import optax
 from jax import numpy as jnp
 from torch.utils.data import DataLoader
+from jaxtyping import PyTree, PyTreeDef
 
 from .dataloader import NumPyLoader
 from .model import Flumen
 from .typing import BatchedOutput, Inputs
 
 
-def evaluate(dataloader: NumPyLoader, model: Flumen) -> float:
+def evaluate(
+    dataloader: NumPyLoader, flat_model: PyTree, model_treedef: PyTreeDef
+) -> float:
     total_loss = jnp.array(0.0)
     for y, inputs in dataloader:
-        total_loss += equinox.filter_jit(compute_loss)(model, inputs, y)
+        total_loss += compute_loss_flat(flat_model, model_treedef, inputs, y)
     return total_loss.item() / len(dataloader)
 
 
@@ -35,6 +38,18 @@ def torch2jax(dataloader: DataLoader) -> Iterator[tuple[BatchedOutput, Inputs]]:
         )
 
 
+@equinox.filter_jit
+def compute_loss_flat(
+    flat_model, model_treedef: PyTreeDef, inputs: Inputs, y: BatchedOutput
+) -> jax.Array:
+    model = jax.tree_util.tree_unflatten(model_treedef, flat_model)
+    x, rnn_input, tau, length = inputs
+    y_pred = jax.vmap(model)(x, rnn_input, tau, length)
+    loss_val = jnp.sum(jnp.square(y - y_pred))
+
+    return loss_val
+
+
 def compute_loss(model: Flumen, inputs: Inputs, y: BatchedOutput) -> jax.Array:
     x, rnn_input, tau, length = inputs
     y_pred = jax.vmap(model)(x, rnn_input, tau, length)
@@ -45,17 +60,24 @@ def compute_loss(model: Flumen, inputs: Inputs, y: BatchedOutput) -> jax.Array:
 
 @equinox.filter_jit
 def train_step(
-    model: Flumen,
+    flat_model: PyTree,
+    model_treedef: PyTreeDef,
     inputs: Inputs,
     y: BatchedOutput,
     optimiser: optax.GradientTransformation,
-    state: optax.OptState,
-) -> tuple[Flumen, optax.OptState, jax.Array]:
+    flat_state: PyTree,
+    state_treedef: PyTreeDef,
+) -> tuple[PyTree, PyTree, jax.Array]:
+    model = jax.tree_util.tree_unflatten(model_treedef, flat_model)
+    state = jax.tree_util.tree_unflatten(state_treedef, flat_state)
     loss, grad = equinox.filter_value_and_grad(compute_loss)(model, inputs, y)
     update, new_state = optimiser.update(grad, state)
     model = equinox.apply_updates(model, update)
 
-    return model, new_state, loss
+    flat_model = jax.tree_util.tree_leaves(model)
+    flat_state = jax.tree_util.tree_leaves(new_state)
+
+    return flat_model, flat_state, loss
 
 
 class MetricMonitor:

@@ -174,8 +174,11 @@ def main():
         rtol=0.0,
     )
 
-    train_loss = evaluate(train_dl, model)
-    val_loss = evaluate(val_dl, model)
+    flat_model, model_treedef = jax.tree_util.tree_flatten(model)
+    flat_state, state_treedef = jax.tree_util.tree_flatten(state)
+
+    train_loss = evaluate(train_dl, flat_model, model_treedef)
+    val_loss = evaluate(val_dl, flat_model, model_treedef)
 
     lr_monitor.update(val_loss)
     early_stop.update(val_loss)
@@ -192,16 +195,18 @@ def main():
     train_time = time()
     for epoch in range(run.config["n_epochs"]):
         for y, inputs in train_dl:
-            model, state, _ = train_step(
-                model,
+            flat_model, flat_state, _ = train_step(
+                flat_model,
+                model_treedef,
                 inputs,
                 y,
                 optim,
-                state,
+                flat_state,
+                state_treedef,
             )
 
-        train_loss = evaluate(train_dl, model)
-        val_loss = evaluate(val_dl, model)
+        train_loss = evaluate(train_dl, flat_model, model_treedef)
+        val_loss = evaluate(val_dl, flat_model, model_treedef)
         stop = early_stop.update(val_loss)
 
         print_losses(
@@ -212,6 +217,7 @@ def main():
         )
 
         if early_stop.is_best:
+            model = jax.tree_util.tree_unflatten(model_treedef, flat_model)
             equinox.tree_serialise_leaves(model_save_dir / "leaves.eqx", model)
 
             if epoch >= last_log_epoch + args.model_log_rate:
@@ -255,10 +261,11 @@ def main():
     model = equinox.tree_deserialise_leaves(
         model_save_dir / "leaves.eqx", model
     )
+    flat_model, model_treedef = jax.tree_util.tree_flatten(model)
 
     test_data = NumPyDataset(TrajectoryDataset(data["test"]))
     test_dl = NumPyLoader(test_data, batch_size=bs, shuffle=False)
-    test_loss = evaluate(test_dl, model)
+    test_loss = evaluate(test_dl, flat_model, model_treedef)
     run.summary["best_test"] = test_loss
     print(f"Test loss: {test_loss:.5e}")
 

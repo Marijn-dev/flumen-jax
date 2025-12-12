@@ -1,31 +1,22 @@
 import sys
-from typing import Iterator, cast
+from typing import Iterator
 
 import equinox
 import jax
 import optax
 from jax import numpy as jnp
-from jaxtyping import Array, Float, UInt
 from torch.utils.data import DataLoader
 
+from .dataloader import NumPyLoader
 from .model import Flumen
-
-BatchedState = Float[Array, "batch state_dim"]
-BatchedOutput = Float[Array, "batch output_dim"]
-BatchedRNNInput = Float[Array, "batch seq_len control_dim+1"]
-BatchedTimeIncrement = Float[Array, "batch 1"]
-BatchLengths = UInt[Array, "batch 1"]
-
-Inputs = tuple[
-    BatchedState, BatchedRNNInput, BatchedTimeIncrement, BatchLengths
-]
+from .typing import BatchedOutput, Inputs
 
 
-def evaluate(dataloader: DataLoader, model: Flumen) -> float:
-    total_loss = 0.0
-    for y, inputs in torch2jax(dataloader):
-        total_loss += compute_loss(model, inputs, y).item()
-    return total_loss / len(dataloader.dataset)  # type: ignore
+def evaluate(dataloader: NumPyLoader, model: Flumen) -> float:
+    total_loss = jnp.array(0.0)
+    for y, inputs in dataloader:
+        total_loss += equinox.filter_jit(compute_loss)(model, inputs, y)
+    return total_loss.item() / len(dataloader.data)
 
 
 def torch2jax(dataloader: DataLoader) -> Iterator[tuple[BatchedOutput, Inputs]]:
@@ -44,10 +35,9 @@ def torch2jax(dataloader: DataLoader) -> Iterator[tuple[BatchedOutput, Inputs]]:
         )
 
 
-@equinox.filter_jit
-def compute_loss(model: Flumen, inputs: Inputs, y: jax.Array):
-    x, rnn_input, tau, batch_lens = inputs
-    y_pred = jax.vmap(model)(x, rnn_input, tau, batch_lens)
+def compute_loss(model: Flumen, inputs: Inputs, y: BatchedOutput) -> jax.Array:
+    x, rnn_input, tau, length = inputs
+    y_pred = jax.vmap(model)(x, rnn_input, tau, length)
     loss_val = jnp.sum(jnp.square(y - y_pred))
 
     return loss_val
@@ -62,7 +52,7 @@ def train_step(
     state: optax.OptState,
 ) -> tuple[Flumen, optax.OptState, jax.Array]:
     loss, grad = equinox.filter_value_and_grad(compute_loss)(model, inputs, y)
-    update, new_state = optimiser.update(grad, state, cast(optax.Params, model))
+    update, new_state = optimiser.update(grad, state)
     model = equinox.apply_updates(model, update)
 
     return model, new_state, loss

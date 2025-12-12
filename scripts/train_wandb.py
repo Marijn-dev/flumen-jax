@@ -8,19 +8,16 @@ from typing import cast
 
 import equinox
 import jax
-import torch
 import yaml
 from flumen import TrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-from torch.utils.data import DataLoader
 
 import wandb
 from flumen_jax.train import (
     MetricMonitor,
     evaluate,
     reduce_learning_rate,
-    torch2jax,
     train_step,
 )
 from flumen_jax.utils import (
@@ -32,6 +29,7 @@ from flumen_jax.utils import (
     print_header,
     print_losses,
 )
+from flumen_jax.dataloader import NumPyLoader, NumPyDataset
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
@@ -117,22 +115,19 @@ def main():
     )
     model_name = f"flumen_jax-{timestamp}-{data_path.stem}-{run.id}"
 
-    model_key, model_key_seed, array_id, torch_seed = handle_seeds()
+    model_key, model_key_seed, array_id, _ = handle_seeds()
     wandb.config["model_key_seed"] = model_key_seed
-    wandb.config["torch_seed"] = torch_seed
     if array_id:
         wandb.config["array_id"] = array_id
 
-    torch.manual_seed(torch_seed)
-
-    train_data = TrajectoryDataset(data["train"])
-    val_data = TrajectoryDataset(data["val"])
-    test_data = TrajectoryDataset(data["test"])
+    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
+    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
+    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
 
     bs = TRAIN_CONFIG["batch_size"]
-    train_dl = DataLoader(train_data, batch_size=bs, shuffle=True)
-    val_dl = DataLoader(val_data, batch_size=bs, shuffle=True)
-    test_dl = DataLoader(test_data, batch_size=bs, shuffle=True)
+    train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
+    val_dl = NumPyLoader(val_data, batch_size=bs, shuffle=False)
+    test_dl = NumPyLoader(test_data, batch_size=bs, shuffle=False)
 
     model_args = {
         "state_dim": train_data.state_dim,
@@ -188,7 +183,7 @@ def main():
     last_log_epoch = 0
     train_time = time()
     for epoch in range(run.config["n_epochs"]):
-        for y, inputs in torch2jax(train_dl):
+        for y, inputs in train_dl:
             model, state, _ = train_step(
                 model,
                 inputs,

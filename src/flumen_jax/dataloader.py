@@ -58,7 +58,7 @@ class NumPyDataset:
 
 
 def dataloader(
-    data: NumPyDataset, batch_size, shuffle
+    data: NumPyDataset, batch_size, shuffle, skip_last
 ) -> Iterator[tuple[BatchedOutput, Inputs]]:
     dlen = len(data)
     indices = np.arange(dlen)
@@ -71,13 +71,26 @@ def dataloader(
         yield data[batch_perm]
         start = end
         end = start + batch_size
+    if not skip_last and start < dlen:
+        yield data[start:dlen]
 
 
 class NumPyLoader:
-    def __init__(self, data: NumPyDataset, batch_size: int, shuffle=True):
+    def __init__(
+        self, data: NumPyDataset, batch_size: int, shuffle=True, skip_last=True
+    ):
         self.data = data
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.skip_last = skip_last
 
     def __iter__(self):
-        return dataloader(self.data, self.batch_size, self.shuffle)
+        return dataloader(
+            self.data, self.batch_size, self.shuffle, self.skip_last
+        )
+
+    def __len__(self):
+        if self.skip_last:
+            return len(self.data) - len(self.data) % self.batch_size
+
+        return len(self.data)

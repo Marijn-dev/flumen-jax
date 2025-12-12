@@ -16,7 +16,7 @@ def evaluate(dataloader: NumPyLoader, model: Flumen) -> float:
     total_loss = jnp.array(0.0)
     for y, inputs in dataloader:
         total_loss += equinox.filter_jit(compute_loss)(model, inputs, y)
-    return total_loss.item() / len(dataloader.data)
+    return total_loss.item() / len(dataloader)
 
 
 def torch2jax(dataloader: DataLoader) -> Iterator[tuple[BatchedOutput, Inputs]]:

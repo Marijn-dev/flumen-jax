@@ -3,9 +3,9 @@ import jax
 from equinox.nn import MLP, LSTMCell
 from jax import numpy as jnp
 from jax import random as jrd
-from jaxtyping import Array, Float, PRNGKeyArray, UInt
+from jaxtyping import Array, Float, PRNGKeyArray, Scalar, UInt
 
-from .typing import Output, State, RNNInput, Input, TimeIncrement
+from .typing import Input, Output, RNNInput, State, TimeIncrement
 
 
 class Flumen(equinox.Module):
@@ -54,7 +54,7 @@ class Flumen(equinox.Module):
         initial_state: State,
         rnn_input: RNNInput,
         tau: TimeIncrement,
-        len: UInt[Array, "1"],
+        len: UInt[Scalar, ""],
     ) -> Output:
         h = self.encoder(initial_state)
         c = jnp.zeros_like(h)
@@ -74,9 +74,9 @@ class Flumen(equinox.Module):
         self,
         initial_state: State,
         u: Input,
-        tau: Float[Array, "n_time_pts 1"],  # noqa: F722
+        tau: Float[Array, "n_time_pts 1"],
         skips: UInt[Array, "n_time_pts"],  # noqa: F821
-    ) -> Float[Array, "n_time_pts output_dim"]:  # noqa: F722
+    ) -> Float[Array, "n_time_pts output_dim"]:
         h = self.encoder(initial_state)
         c = jnp.zeros_like(h)
 

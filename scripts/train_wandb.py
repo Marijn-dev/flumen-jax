@@ -13,7 +13,7 @@ import yaml
 from flumen import TrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-
+from jax import numpy as jnp
 import wandb
 from flumen_jax.dataloader import NumPyDataset, NumPyLoader
 from flumen_jax.train import (
@@ -121,7 +121,6 @@ def main():
         run.config["array_id"] = array_id
 
     np.random.seed(numpy_seed)
-
     train_data = NumPyDataset(TrajectoryDataset(data["train"]))
     val_data = NumPyDataset(TrajectoryDataset(data["val"]))
 
@@ -232,7 +231,7 @@ def main():
             if epoch >= last_log_epoch + args.model_log_rate:
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
-
+            
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss
             run.summary["best_epoch"] = epoch + 1

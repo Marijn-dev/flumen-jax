@@ -13,7 +13,7 @@ import yaml
 from flumen import TrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-
+from jax import numpy as jnp
 import wandb
 from flumen_jax.dataloader import NumPyDataset, NumPyLoader
 from flumen_jax.train import (
@@ -31,6 +31,7 @@ from flumen_jax.utils import (
     prepare_model_saving,
     print_header,
     print_losses,
+    visualize_trajectory,
 )
 
 TRAIN_CONFIG: TrainConfig = {
@@ -49,6 +50,7 @@ TRAIN_CONFIG: TrainConfig = {
     "es_atol": 5e-5,
 }
 
+ONLINE_VISUALIZATION = True
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
 
@@ -130,7 +132,6 @@ def main():
         wandb.config["array_id"] = array_id
 
     np.random.seed(numpy_seed)
-
     train_data = NumPyDataset(TrajectoryDataset(data["train"]))
     val_data = NumPyDataset(TrajectoryDataset(data["val"]))
 
@@ -239,6 +240,19 @@ def main():
             if epoch >= last_log_epoch + args.model_log_rate:
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
+            
+            if ONLINE_VISUALIZATION:
+                trajectory_nr = 0 # which trajectory to visualize
+                delta = data["settings"]["control_delta"]
+                x0, t, y, u = data['test'][trajectory_nr]
+                x0, t, y, u = x0.numpy(),t.numpy(),y.numpy(),u.numpy()
+                
+                skips = jnp.floor(t / delta).astype(jnp.uint32)
+                tau = (t - delta * skips) / delta
+                y_pred = model.eval_trajectory(x0, u, tau, skips.squeeze())
+                fig = visualize_trajectory(y,y_pred)
+                wandb.log({"test_trajectory":wandb.Image(fig),"epoch":epoch + 1})
+                del x0, t, y, u
 
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss

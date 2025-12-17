@@ -33,6 +33,25 @@ from flumen_jax.utils import (
     print_losses,
 )
 
+<<<<<<< HEAD
+=======
+TRAIN_CONFIG: TrainConfig = {
+    "batch_size": 128,
+    "feature_dim": 24,
+    "encoder_hsz": 128,
+    "decoder_hsz": 128,
+    "learning_rate": 1e-3,
+    "n_epochs": 500,
+    "sched_factor": 2,
+    "sched_patience": 10,
+    "sched_rtol": 1e-4,
+    "sched_eps": 1e-8,
+    "init_last_layer_bias": True,
+    "es_patience": 20,
+    "es_atol": 5e-5,
+}
+
+>>>>>>> 1de0487 (added online trajectory visualization as input argument)
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
 
@@ -91,7 +110,12 @@ def main():
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
     ap.add_argument("--outdir", type=str, default="./outputs")
-
+    ap.add_argument(
+        "--trajectory_visualization",
+        action="store_true",
+        default=False,
+        help="Visualize a trajectory during W&B logging when a best model is encountered",
+    )
     args = ap.parse_args()
     data_path = Path(args.load_path)
 
@@ -231,7 +255,26 @@ def main():
             if epoch >= last_log_epoch + args.model_log_rate:
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
+<<<<<<< HEAD
             
+=======
+
+            if args.trajectory_visualization:
+                trajectory_nr = 0  # the trajectory to visualize
+                delta = data["settings"]["control_delta"]
+                x0, t, y, u = data["test"][trajectory_nr]
+                x0, t, y, u = x0.numpy(), t.numpy(), y.numpy(), u.numpy()
+
+                skips = jnp.floor(t / delta).astype(jnp.uint32)
+                tau = (t - delta * skips) / delta
+                y_pred = model.eval_trajectory(x0, u, tau, skips.squeeze())
+                fig = visualize_trajectory(y, y_pred)
+                wandb.log(
+                    {"test_trajectory": wandb.Image(fig), "epoch": epoch + 1}
+                )
+                del x0, t, y, u
+
+>>>>>>> 1de0487 (added online trajectory visualization as input argument)
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss
             run.summary["best_epoch"] = epoch + 1

@@ -50,7 +50,6 @@ TRAIN_CONFIG: TrainConfig = {
     "es_atol": 5e-5,
 }
 
-ONLINE_VISUALIZATION = True
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
 
@@ -105,7 +104,12 @@ def main():
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
     ap.add_argument("--outdir", type=str, default="./outputs")
-
+    ap.add_argument(
+        "--trajectory_visualization",
+        action="store_true",
+        default=False,
+        help="Visualize a trajectory during W&B logging when a best model is encountered",
+    )
     args = ap.parse_args()
     data_path = Path(args.load_path)
 
@@ -240,18 +244,20 @@ def main():
             if epoch >= last_log_epoch + args.model_log_rate:
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
-            
-            if ONLINE_VISUALIZATION:
-                trajectory_nr = 0 # which trajectory to visualize
+
+            if args.trajectory_visualization:
+                trajectory_nr = 0  # the trajectory to visualize
                 delta = data["settings"]["control_delta"]
-                x0, t, y, u = data['test'][trajectory_nr]
-                x0, t, y, u = x0.numpy(),t.numpy(),y.numpy(),u.numpy()
-                
+                x0, t, y, u = data["test"][trajectory_nr]
+                x0, t, y, u = x0.numpy(), t.numpy(), y.numpy(), u.numpy()
+
                 skips = jnp.floor(t / delta).astype(jnp.uint32)
                 tau = (t - delta * skips) / delta
                 y_pred = model.eval_trajectory(x0, u, tau, skips.squeeze())
-                fig = visualize_trajectory(y,y_pred)
-                wandb.log({"test_trajectory":wandb.Image(fig),"epoch":epoch + 1})
+                fig = visualize_trajectory(y, y_pred)
+                wandb.log(
+                    {"test_trajectory": wandb.Image(fig), "epoch": epoch + 1}
+                )
                 del x0, t, y, u
 
             run.summary["best_train"] = train_loss

@@ -12,6 +12,7 @@ from flumen_jax import Flumen
 from flumen_jax.typing import Output
 from jax import numpy as jnp
 
+
 class TrainConfig(TypedDict):
     batch_size: int
     feature_dim: int
@@ -94,18 +95,20 @@ def make_model(args: dict[str, int], key: PRNGKeyArray) -> Flumen:
 
     return model
 
-def visualize_trajectory(y: Float[Array, "dlen state_dim"], y_pred: Float[Array, "dlen state_dim"]) -> Figure:
-    fig, ax = plt.subplots(y.shape[1],1,sharex=True)
+
+def visualize_trajectory(
+    y: Float[Array, "n_time_pts output_dim"], y_pred: Float[Array, "n_time_pts output_dim"]
+) -> Figure:
+    fig, ax = plt.subplots(y.shape[1], 1, sharex=True)
 
     for k, ax_ in enumerate(ax[: y.shape[1]]):
-            sq_error = jnp.mean(jnp.square(y_pred[:, k] - y[:, k]))
-            ax_.plot(y_pred[:, k], c="orange", label="Model output")
-            ax_.plot(y[:, k], "b--", label="True state")
-            ax_.set_ylabel(f"$x_{k + 1}$")
-            ax_.set_title(f"$error:{sq_error:.2f}$".format(sq_error))
-        
-    return fig
+        sq_error = jnp.mean(jnp.square(y_pred[:, k] - y[:, k]))
+        ax_.plot(y_pred[:, k], c="orange", label="Model output")
+        ax_.plot(y[:, k], "b--", label="True state")
+        ax_.set_ylabel(f"$x_{k + 1}$")
+        ax_.set_title(f"$error:{sq_error:.2f}$".format(sq_error))
 
+    return fig
 
 
 def init_last_layer_bias(model: Flumen, val: Output, sum=True) -> Flumen:

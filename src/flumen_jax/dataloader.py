@@ -2,7 +2,7 @@ from typing import Iterator
 
 import jax
 import numpy as np
-from flumen import TrajectoryDataset
+from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jaxtyping import Array, Float, UInt
 
 from .typing import BatchedOutput, Inputs
@@ -57,8 +57,24 @@ class NumPyDataset:
         return self.y.shape[0]
 
 
+class ParameterisedNumPyDataset(NumPyDataset):
+    parameter: Float[Array, "dlen 1"]
+
+    def __init__(self, data: ParameterisedTrajectoryDataset):
+        super().__init__(data)
+
+        self.parameter = jax.tree_map(np.asarray, data.parameter)
+
+    def __getitem__(self, index):
+        y, inputs = super().__getitem__(index)
+        return y, (*inputs, self.parameter[index])
+
+
 def dataloader(
-    data: NumPyDataset, batch_size, shuffle, skip_last
+    data: NumPyDataset | ParameterisedNumPyDataset,
+    batch_size,
+    shuffle,
+    skip_last,
 ) -> Iterator[tuple[BatchedOutput, Inputs]]:
     dlen = len(data)
     indices = np.arange(dlen)
@@ -77,7 +93,11 @@ def dataloader(
 
 class NumPyLoader:
     def __init__(
-        self, data: NumPyDataset, batch_size: int, shuffle=True, skip_last=True
+        self,
+        data: NumPyDataset | ParameterisedNumPyDataset,
+        batch_size: int,
+        shuffle=True,
+        skip_last=True,
     ):
         self.data = data
         self.batch_size = batch_size

@@ -13,7 +13,6 @@ import yaml
 from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-from jax import numpy as jnp
 import wandb
 from flumen_jax.dataloader import (
     NumPyDataset,
@@ -35,7 +34,6 @@ from flumen_jax.utils import (
     prepare_model_saving,
     print_header,
     print_losses,
-    visualize_trajectory,
 )
 
 TRAIN_CONFIG: TrainConfig = {
@@ -108,12 +106,7 @@ def main():
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
     ap.add_argument("--outdir", type=str, default="./outputs")
-    ap.add_argument(
-        "--trajectory_visualization",
-        action="store_true",
-        default=False,
-        help="Visualize a trajectory during W&B logging when a best model is encountered",
-    )
+
     args = ap.parse_args()
     data_path = Path(args.load_path)
 
@@ -263,21 +256,6 @@ def main():
             if epoch >= last_log_epoch + args.model_log_rate:
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
-
-            if args.trajectory_visualization:
-                trajectory_nr = 0  # the trajectory to visualize
-                delta = data["settings"]["control_delta"]
-                x0, t, y, u = data["test"][trajectory_nr]
-                x0, t, y, u = x0.numpy(), t.numpy(), y.numpy(), u.numpy()
-
-                skips = jnp.floor(t / delta).astype(jnp.uint32)
-                tau = (t - delta * skips) / delta
-                y_pred = model.eval_trajectory(x0, u, tau, skips.squeeze())
-                fig = visualize_trajectory(y, y_pred)
-                wandb.log(
-                    {"test_trajectory": wandb.Image(fig), "epoch": epoch + 1}
-                )
-                del x0, t, y, u
 
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss

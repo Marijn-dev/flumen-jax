@@ -13,7 +13,6 @@ import yaml
 from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-from jax import numpy as jnp
 import wandb
 from flumen_jax.dataloader import (
     NumPyDataset,
@@ -114,12 +113,7 @@ def main():
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
     ap.add_argument("--outdir", type=str, default="./outputs")
-    ap.add_argument(
-        "--trajectory_visualization",
-        action="store_true",
-        default=False,
-        help="Visualize a trajectory during W&B logging when a best model is encountered",
-    )
+
     args = ap.parse_args()
     data_path = Path(args.load_path)
 
@@ -284,6 +278,7 @@ def main():
             
 =======
 
+<<<<<<< HEAD
             if args.trajectory_visualization:
                 trajectory_nr = 0  # the trajectory to visualize
                 delta = data["settings"]["control_delta"]
@@ -300,6 +295,8 @@ def main():
                 del x0, t, y, u
 
 >>>>>>> 1de0487 (added online trajectory visualization as input argument)
+=======
+>>>>>>> 0f22fec (removed online trajectory visualization)
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss
             run.summary["best_epoch"] = epoch + 1

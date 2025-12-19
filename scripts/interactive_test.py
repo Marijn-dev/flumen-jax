@@ -21,11 +21,11 @@ from typing import cast
 
 
 @equinox.filter_jit
-def eval_trajectory(model: Flumen, t, x0, u, delta):
+def eval_trajectory(model: Flumen, t, x0, u, delta, parameter=None):
     skips = jnp.floor(t / delta).astype(jnp.uint32)
     tau = (t - delta * skips) / delta
 
-    return model.eval_trajectory(x0, u, tau, skips.squeeze())
+    return model.eval_trajectory(x0, u, tau, skips.squeeze(), parameter)
 
 
 def parse_args():
@@ -71,7 +71,6 @@ def main():
 
     if args.print_info:
         return
-
     model: Flumen = equinox.filter_eval_shape(
         Flumen, **metadata["args"], key=jrd.key(0)
     )
@@ -104,13 +103,21 @@ def main():
 
     while True:
         time_integrate = time()
-        x0, t, y, u = sampler.get_example(
-            time_horizon=time_horizon, n_samples=int(1 + 20 * time_horizon)
-        )
+        if sampler._dyn._is_parameterised:
+            x0, t, y, u, parameter = sampler.get_example(
+                time_horizon=time_horizon, n_samples=int(1 + 20 * time_horizon)
+            )
+            print("parameter(s) this trajectory: ", parameter)
+        else:
+            x0, t, y, u = sampler.get_example(
+                time_horizon=time_horizon, n_samples=int(1 + 20 * time_horizon)
+            )
+            parameter = None
+
         time_integrate = time() - time_integrate
 
         time_predict = time()
-        y_pred = eval_trajectory(model, t, x0, u, delta)
+        y_pred = eval_trajectory(model, t, x0, u, delta, parameter)
         time_predict = time() - time_predict
 
         print(f"Timings: {time_integrate}, {time_predict}")

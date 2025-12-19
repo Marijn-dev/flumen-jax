@@ -10,7 +10,7 @@ from jaxtyping import PyTree, PyTreeDef
 
 from .dataloader import NumPyLoader
 from .model import Flumen
-from .typing import BatchedOutput, Inputs
+from .typing import BatchedOutput, Inputs, Inputs_withParam
 
 
 def evaluate(
@@ -40,19 +40,32 @@ def torch2jax(dataloader: DataLoader) -> Iterator[tuple[BatchedOutput, Inputs]]:
 
 @equinox.filter_jit
 def compute_loss_flat(
-    flat_model, model_treedef: PyTreeDef, inputs: Inputs, y: BatchedOutput
+    flat_model,
+    model_treedef: PyTreeDef,
+    inputs: Inputs | Inputs_withParam,
+    y: BatchedOutput,
 ) -> jax.Array:
     model = jax.tree_util.tree_unflatten(model_treedef, flat_model)
-    x, rnn_input, tau, length = inputs
-    y_pred = jax.vmap(model)(x, rnn_input, tau, length)
+    x, rnn_input, tau, length, *parameter = inputs
+    parameter = parameter[0] if parameter else None
+    if parameter is None:
+        y_pred = jax.vmap(model)(x, rnn_input, tau, length)
+    else:
+        y_pred = jax.vmap(model)(x, rnn_input, tau, length, parameter)
     loss_val = jnp.sum(jnp.square(y - y_pred))
 
     return loss_val
 
 
-def compute_loss(model: Flumen, inputs: Inputs, y: BatchedOutput) -> jax.Array:
-    x, rnn_input, tau, length = inputs
-    y_pred = jax.vmap(model)(x, rnn_input, tau, length)
+def compute_loss(
+    model: Flumen, inputs: Inputs | Inputs_withParam, y: BatchedOutput
+) -> jax.Array:
+    x, rnn_input, tau, length, *parameter = inputs
+    parameter = parameter[0] if parameter else None
+    if parameter is None:
+        y_pred = jax.vmap(model)(x, rnn_input, tau, length)
+    else:
+        y_pred = jax.vmap(model)(x, rnn_input, tau, length, parameter)
     loss_val = jnp.sum(jnp.square(y - y_pred))
 
     return loss_val
@@ -62,7 +75,7 @@ def compute_loss(model: Flumen, inputs: Inputs, y: BatchedOutput) -> jax.Array:
 def train_step(
     flat_model: PyTree,
     model_treedef: PyTreeDef,
-    inputs: Inputs,
+    inputs: Inputs | Inputs_withParam,
     y: BatchedOutput,
     optimiser: optax.GradientTransformation,
     flat_state: PyTree,

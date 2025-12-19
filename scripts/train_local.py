@@ -8,10 +8,14 @@ import equinox
 import jax
 import numpy as np
 import yaml
-from flumen import TrajectoryDataset
+from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
 
-from flumen_jax.dataloader import NumPyDataset, NumPyLoader
+from flumen_jax.dataloader import (
+    NumPyDataset,
+    ParameterisedNumPyDataset,
+    NumPyLoader,
+)
 from flumen_jax.train import (
     MetricMonitor,
     evaluate,
@@ -64,8 +68,21 @@ def main():
     with data_path.open("rb") as f:
         data = pickle.load(f)
 
-    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
-    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
+    DatasetMappingTensor = {
+        True: ParameterisedTrajectoryDataset,
+        False: TrajectoryDataset,
+    }
+
+    DatasetMappingNumPy = {
+        True: ParameterisedNumPyDataset,
+        False: NumPyDataset,
+    }
+
+    DatasetTensor = DatasetMappingTensor[data["train"].is_parameterised]
+    DatasetNumPy = DatasetMappingNumPy[data["train"].is_parameterised]
+
+    train_data = DatasetNumPy(DatasetTensor(data["train"]))
+    val_data = DatasetNumPy(DatasetTensor(data["val"]))
 
     bs = TRAIN_CONFIG["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
@@ -80,6 +97,7 @@ def main():
         "feature_dim": TRAIN_CONFIG["feature_dim"],
         "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],
+        "use_parameter": data["train"].is_parameterised,
     }
 
     model_metadata = {
@@ -187,7 +205,8 @@ def main():
     model = equinox.tree_deserialise_leaves(
         model_save_dir / "leaves.eqx", model
     )
-    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
+
+    test_data = DatasetNumPy(DatasetTensor(data["test"]))
     test_dl = NumPyLoader(
         test_data, batch_size=bs, shuffle=False, skip_last=False
     )

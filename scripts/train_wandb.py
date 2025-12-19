@@ -10,12 +10,16 @@ import equinox
 import jax
 import numpy as np
 import yaml
-from flumen import TrajectoryDataset
+from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
 from jax import numpy as jnp
 import wandb
-from flumen_jax.dataloader import NumPyDataset, NumPyLoader
+from flumen_jax.dataloader import (
+    NumPyDataset,
+    ParameterisedNumPyDataset,
+    NumPyLoader,
+)
 from flumen_jax.train import (
     MetricMonitor,
     evaluate,
@@ -36,7 +40,7 @@ from flumen_jax.utils import (
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
-    "feature_dim": 24,
+    "feature_dim": 48,
     "encoder_hsz": 128,
     "decoder_hsz": 128,
     "learning_rate": 1e-3,
@@ -136,8 +140,22 @@ def main():
         wandb.config["array_id"] = array_id
 
     np.random.seed(numpy_seed)
-    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
-    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
+
+    DatasetMappingTensor = {
+        True: ParameterisedTrajectoryDataset,
+        False: TrajectoryDataset,
+    }
+
+    DatasetMappingNumPy = {
+        True: ParameterisedNumPyDataset,
+        False: NumPyDataset,
+    }
+
+    DatasetTensor = DatasetMappingTensor[data["train"].is_parameterised]
+    DatasetNumPy = DatasetMappingNumPy[data["train"].is_parameterised]
+
+    train_data = DatasetNumPy(DatasetTensor(data["train"]))
+    val_data = DatasetNumPy(DatasetTensor(data["val"]))
 
     bs = TRAIN_CONFIG["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
@@ -152,6 +170,7 @@ def main():
         "feature_dim": TRAIN_CONFIG["feature_dim"],
         "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],
+        "use_parameter": data["train"].is_parameterised,
     }
 
     model_metadata = {
@@ -299,7 +318,7 @@ def main():
     )
     flat_model, model_treedef = jax.tree_util.tree_flatten(model)
 
-    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
+    test_data = DatasetNumPy(DatasetTensor(data["test"]))
     test_dl = NumPyLoader(
         test_data, batch_size=bs, shuffle=False, skip_last=False
     )

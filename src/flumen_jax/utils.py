@@ -90,6 +90,7 @@ def make_model(args: dict[str, int], key: PRNGKeyArray) -> Flumen:
         args["feature_dim"],
         args["encoder_hsz"],
         args["decoder_hsz"],
+        args["use_parameter"],
         key=key,
     )
 
@@ -97,7 +98,8 @@ def make_model(args: dict[str, int], key: PRNGKeyArray) -> Flumen:
 
 
 def visualize_trajectory(
-    y: Float[Array, "n_time_pts output_dim"], y_pred: Float[Array, "n_time_pts output_dim"]
+    y: Float[Array, "n_time_pts output_dim"],
+    y_pred: Float[Array, "n_time_pts output_dim"],
 ) -> Figure:
     fig, ax = plt.subplots(y.shape[1], 1, sharex=True)
 

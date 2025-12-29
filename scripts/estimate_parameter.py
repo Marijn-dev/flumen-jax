@@ -54,7 +54,7 @@ def main():
     # load in parameter estimator
     parameter_estimator = ParameterEstimator(model, sampler)
     parameter_estimator.reset_rngs()
-    _ = parameter_estimator()  # predict parameter
+    _ = parameter_estimator()  # predict parameter, for own input: parameter_estimator(true_parameter=np.array([true param]), init_parameter=np.array([init param]))
 
 
 if __name__ == "__main__":

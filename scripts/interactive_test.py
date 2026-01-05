@@ -105,7 +105,11 @@ def main():
         time_integrate = time()
         if sampler._dyn._is_parameterised:
             x0, t, y, u, parameter = sampler.get_example(
-                time_horizon=time_horizon, n_samples=int(1 + 20 * time_horizon)
+                time_horizon=time_horizon,
+                n_samples=int(1 + 20 * time_horizon),
+                parameter=(
+                    sampler._dyn._parameter_generator.sample(sampler._param_rng)
+                ),
             )
             print("parameter(s) this trajectory: ", parameter)
         else:

@@ -41,6 +41,7 @@ class NumPyDataset:
         self.state_dim = data.state_dim
         self.output_dim = data.output_dim
         self.control_dim = data.control_dim
+        self.parameter_dim = data.parameter_dim
 
     def __getitem__(self, index) -> tuple[BatchedOutput, Inputs]:
         return (
@@ -58,7 +59,7 @@ class NumPyDataset:
 
 
 class ParameterisedNumPyDataset(NumPyDataset):
-    parameter: Float[Array, "dlen 1"]
+    parameter: Float[Array, "dlen parameter_dim"]
 
     def __init__(self, data: ParameterisedTrajectoryDataset):
         super().__init__(data)

@@ -1,15 +1,17 @@
-import torch
-
-torch.set_default_dtype(torch.float32)
-
-import pickle, yaml
+from flumen import (
+    RawTrajectoryDataset,
+    ParamaterisedRawTrajectoryDataset,
+)
+from semble import TrajectorySampler, TSamplerSpec, make_trajectory_sampler
+from scipy.signal import find_peaks
 from pathlib import Path
 from argparse import ArgumentParser, ArgumentTypeError
 
-from scipy.signal import find_peaks
+import torch
+import pickle
+import yaml
 
-from semble import TrajectorySampler, TSamplerSpec, make_trajectory_sampler
-from flumen import RawTrajectoryDataset, ParamaterisedRawTrajectoryDataset, TrajectoryDataset, ParameterisedTrajectoryDataset
+torch.set_default_dtype(torch.float32)
 
 
 def main():
@@ -187,7 +189,7 @@ def generate(args, trajectory_sampler: TrajectorySampler, postprocess=[]):
                 "parameter": parameter,
             }
         else:
-            x0, t, y, u  = trajectory_sampler.get_example(
+            x0, t, y, u = trajectory_sampler.get_example(
                 args.time_horizon, args.n_samples
             )
             return {
@@ -207,22 +209,22 @@ def generate(args, trajectory_sampler: TrajectorySampler, postprocess=[]):
 
     DatasetMapping = {
         True: ParamaterisedRawTrajectoryDataset,
-        False: RawTrajectoryDataset
+        False: RawTrajectoryDataset,
     }
 
     RawDataset = DatasetMapping[trajectory_sampler._dyn._is_parameterised]
-    
+
     train_data = RawDataset(
         train_data_,
-        *trajectory_sampler.dims(),
+        trajectory_sampler.dims(),
         delta=trajectory_sampler._delta,
         output_mask=trajectory_sampler._dyn.mask,
         noise_std=args.noise_std,
     )
-   
+
     val_data = RawDataset(
         val_data,
-        *trajectory_sampler.dims(),
+        trajectory_sampler.dims(),
         delta=trajectory_sampler._delta,
         output_mask=trajectory_sampler._dyn.mask,
         noise_std=args.noise_std,
@@ -230,7 +232,7 @@ def generate(args, trajectory_sampler: TrajectorySampler, postprocess=[]):
 
     test_data = RawDataset(
         test_data,
-        *trajectory_sampler.dims(),
+        trajectory_sampler.dims(),
         delta=trajectory_sampler._delta,
         output_mask=trajectory_sampler._dyn.mask,
         noise_std=args.noise_std,

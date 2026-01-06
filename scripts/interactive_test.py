@@ -80,7 +80,7 @@ def main():
 
     sampler_spec: TSamplerSpec = metadata["data_settings"]
     sampler = make_trajectory_sampler(sampler_spec)
-    _, _, output_dim = sampler.dims()
+    output_dim = sampler.dims()[2]
     sampler.reset_rngs()
     delta = sampler._delta
 

@@ -84,6 +84,7 @@ def make_model(args: dict[str, int], key: PRNGKeyArray) -> Flumen:
         args["state_dim"],
         args["control_dim"],
         args["output_dim"],
+        args["parameter_dim"],
         args["feature_dim"],
         args["encoder_hsz"],
         args["decoder_hsz"],

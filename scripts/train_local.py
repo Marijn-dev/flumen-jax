@@ -94,6 +94,7 @@ def main():
         "state_dim": train_data.state_dim,
         "control_dim": train_data.control_dim,
         "output_dim": train_data.output_dim,
+        "parameter_dim": train_data.parameter_dim,
         "feature_dim": TRAIN_CONFIG["feature_dim"],
         "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],

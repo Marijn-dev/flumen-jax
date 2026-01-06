@@ -20,6 +20,7 @@ class Flumen(equinox.Module):
         state_dim: int,
         control_dim: int,
         output_dim: int,
+        parameter_dim: int,
         feature_dim: int,
         encoder_hsz: int,
         decoder_hsz: int,
@@ -30,7 +31,7 @@ class Flumen(equinox.Module):
         self.use_parameter = use_parameter
 
         self.encoder_init_state = MLP(
-            in_size=state_dim,
+            in_size=state_dim,  # without parameter
             out_size=feature_dim,
             width_size=encoder_hsz,
             depth=2,
@@ -39,7 +40,7 @@ class Flumen(equinox.Module):
         )
 
         self.encoder_init_state_parameter = MLP(
-            in_size=state_dim + 1,  # parameter is added
+            in_size=state_dim + parameter_dim,  # with parameter
             out_size=feature_dim,
             width_size=encoder_hsz,
             depth=2,

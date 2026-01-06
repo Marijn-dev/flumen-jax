@@ -38,7 +38,7 @@ from flumen_jax.utils import (
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
-    "feature_dim": 48,
+    "feature_dim": 32,
     "encoder_hsz": 128,
     "decoder_hsz": 128,
     "learning_rate": 1e-3,
@@ -160,6 +160,7 @@ def main():
         "state_dim": train_data.state_dim,
         "control_dim": train_data.control_dim,
         "output_dim": train_data.output_dim,
+        "parameter_dim": train_data.parameter_dim,
         "feature_dim": TRAIN_CONFIG["feature_dim"],
         "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],

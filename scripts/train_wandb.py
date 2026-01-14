@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from time import time
 from typing import cast
+from torch.utils.data import random_split
 
 import equinox
 import jax
@@ -106,6 +107,7 @@ def main():
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
     ap.add_argument("--outdir", type=str, default="./outputs")
+    ap.add_argument("--data_split", type=float, default=1.0)
 
     args = ap.parse_args()
     data_path = Path(args.load_path)
@@ -155,6 +157,8 @@ def main():
     val_dl = NumPyLoader(
         val_data, batch_size=bs, shuffle=False, skip_last=False
     )
+    train_dl, _ = random_split(train_dl, [args.data_split, 1 - args.data_split])
+    val_dl, _ = random_split(val_dl, [args.data_split, 1 - args.data_split])
 
     model_args = {
         "state_dim": train_data.state_dim,

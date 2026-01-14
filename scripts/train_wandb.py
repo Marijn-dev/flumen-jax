@@ -5,7 +5,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 from time import time
 from typing import cast
-from torch.utils.data import random_split
 
 import equinox
 import jax
@@ -149,17 +148,16 @@ def main():
     DatasetTensor = DatasetMappingTensor[data["train"].is_parameterised]
     DatasetNumPy = DatasetMappingNumPy[data["train"].is_parameterised]
 
-    train_data = DatasetNumPy(DatasetTensor(data["train"]))
-    val_data = DatasetNumPy(DatasetTensor(data["val"]))
+    train_data = DatasetNumPy(
+        DatasetTensor(data["train"]), split=args.data_split
+    )
+    val_data = DatasetNumPy(DatasetTensor(data["val"]), split=args.data_split)
 
     bs = TRAIN_CONFIG["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
     val_dl = NumPyLoader(
         val_data, batch_size=bs, shuffle=False, skip_last=False
     )
-    train_dl, _ = random_split(train_dl, [args.data_split, 1 - args.data_split])
-    val_dl, _ = random_split(val_dl, [args.data_split, 1 - args.data_split])
-
     model_args = {
         "state_dim": train_data.state_dim,
         "control_dim": train_data.control_dim,

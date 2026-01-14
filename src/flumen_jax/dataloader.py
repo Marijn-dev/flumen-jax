@@ -19,7 +19,7 @@ class NumPyDataset:
     output_dim: int
     control_dim: int
 
-    def __init__(self, data: TrajectoryDataset):
+    def __init__(self, data: TrajectoryDataset, split=1.0):
         (
             self.y,
             self.initial_state,
@@ -29,15 +29,14 @@ class NumPyDataset:
         ) = jax.tree_map(
             np.asarray,
             (
-                data.state,
-                data.init_state,
-                data.rnn_input,
-                data.tau,
-                data.seq_lens,
+                data.state[0 : int(split * len(data.state))],
+                data.init_state[0 : int(split * len(data.init_state))],
+                data.rnn_input[0 : int(split * len(data.rnn_input))],
+                data.tau[0 : int(split * len(data.tau))],
+                data.seq_lens[0 : int(split * len(data.seq_lens))],
             ),
         )
         self.lengths = lengths.astype(np.uint32)
-
         self.state_dim = data.state_dim
         self.output_dim = data.output_dim
         self.control_dim = data.control_dim
@@ -61,10 +60,12 @@ class NumPyDataset:
 class ParameterisedNumPyDataset(NumPyDataset):
     parameter: Float[Array, "dlen parameter_dim"]
 
-    def __init__(self, data: ParameterisedTrajectoryDataset):
-        super().__init__(data)
+    def __init__(self, data: ParameterisedTrajectoryDataset, split=1.0):
+        super().__init__(data, split)
 
-        self.parameter = jax.tree_map(np.asarray, data.parameter)
+        self.parameter = jax.tree_map(
+            np.asarray, data.parameter[0 : int(split * len(data.parameter))]
+        )
 
     def __getitem__(self, index):
         y, inputs = super().__getitem__(index)

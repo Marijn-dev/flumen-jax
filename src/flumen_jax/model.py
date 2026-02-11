@@ -21,9 +21,10 @@ class Flumen(equinox.Module):
         feature_dim: int,
         encoder_hsz: int,
         decoder_hsz: int,
-        key: PRNGKeyArray,
         encoder_depth: int = 2,
         decoder_depth: int = 2,
+        *,
+        key: PRNGKeyArray,
     ):
         enc_key, lstm_key, dec_key = jrd.split(key, 3)
 

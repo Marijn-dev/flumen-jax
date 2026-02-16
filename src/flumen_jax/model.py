@@ -21,6 +21,9 @@ class Flumen(equinox.Module):
         feature_dim: int,
         encoder_hsz: int,
         decoder_hsz: int,
+        encoder_depth: int = 2,
+        decoder_depth: int = 2,
+        *,
         key: PRNGKeyArray,
     ):
         enc_key, lstm_key, dec_key = jrd.split(key, 3)
@@ -29,7 +32,7 @@ class Flumen(equinox.Module):
             in_size=state_dim,
             out_size=feature_dim,
             width_size=encoder_hsz,
-            depth=2,
+            depth=encoder_depth,
             activation=jnp.tanh,
             key=enc_key,
         )
@@ -44,7 +47,7 @@ class Flumen(equinox.Module):
             in_size=feature_dim,
             out_size=output_dim,
             width_size=decoder_hsz,
-            depth=2,
+            depth=decoder_depth,
             activation=jnp.tanh,
             key=dec_key,
         )

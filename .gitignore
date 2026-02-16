@@ -209,3 +209,5 @@ __marimo__/
 *.pkl
 data/
 outputs/
+artifacts/
+wandb/

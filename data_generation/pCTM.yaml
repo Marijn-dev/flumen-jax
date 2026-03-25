@@ -1,0 +1,58 @@
+dynamics:
+  name: ParameterisedCellTransmissionModel
+  args:
+    n: &n 200
+    dx: 0.01
+    parameter_generator:
+      name: Product
+      args:
+        # location 1
+        - name: Uniform
+          args:
+            low: 0.00
+            high: 1.0
+
+        # value 1
+        - name: Uniform
+          args:
+            low: 0.05
+            high: 0.30
+
+        # location 2
+        - name: Uniform
+          args:
+            low: 0.00
+            high: 1.0
+
+        # value 2
+        - name: Uniform
+          args:
+            low: 0.05
+            high: 0.30   
+
+        # location 3
+        - name: Uniform
+          args:
+            low: 0.00
+            high: 1.0
+
+        # value 3
+        - name: Uniform
+          args:
+            low: 0.05
+            high: 0.30
+
+sequence_generator:
+  name: UniformSqWave
+  args:
+    period: 1
+    min: 0.
+    max: 1.0
+
+initial_state_generator:
+  name: GreenshieldsInitialState
+  args:
+    n_cells: *n
+    n_sections: 8
+
+control_delta: 1.0

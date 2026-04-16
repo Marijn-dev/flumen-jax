@@ -9,6 +9,7 @@ from typing import cast
 import equinox
 import jax
 import numpy as np
+import jax.numpy as jnp
 import yaml
 from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
@@ -34,36 +35,44 @@ from flumen_jax.utils import (
     prepare_model_saving,
     print_header,
     print_losses,
+    plot_prediction,
 )
 
-TRAIN_CONFIG: TrainConfig = {
-    "batch_size": 128,
-    "feature_dim": 32,
-    "encoder_hsz": 128,
-    "decoder_hsz": 128,
-    "learning_rate": 1e-3,
-    "n_epochs": 500,
-    "sched_factor": 2,
-    "sched_patience": 10,
-    "sched_rtol": 1e-4,
-    "sched_eps": 1e-8,
-    "init_last_layer_bias": True,
-    "es_patience": 20,
-    "es_atol": 5e-5,
-}
+# TRAIN_CONFIG: TrainConfig = {
+#     "batch_size": 128,
+#     "feature_dim": 128,
+#     "encoder_hsz": 128,
+#     "decoder_hsz": 128,
+#     "learning_rate": 1e-3,
+#     "n_epochs": 500,
+#     "sched_factor": 2,
+#     "sched_patience": 10,
+#     "sched_rtol": 1e-4,
+#     "sched_eps": 1e-8,
+#     "init_last_layer_bias": True,
+#     "es_patience": 20,
+#     "es_atol": 5e-5,
+# }
 
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
 
 
-def handle_seeds() -> tuple[PRNGKeyArray, int, int, int, int | None]:
-    model_key_seed_str = os.environ.get("FLUMEN_JAX_SEED")
-    if not model_key_seed_str:
+def handle_seeds(
+    train_config,
+) -> tuple[PRNGKeyArray, int, int, int, int | None]:
+    # model_key_seed_str = os.environ.get("FLUMEN_JAX_SEED")
+    # if not model_key_seed_str:
+    #     print("No model key seed found, using default", file=sys.stderr)
+    #     model_key_seed = DEFAULT_JAX_SEED
+    # else:
+    #     model_key_seed = int(model_key_seed_str)
+
+    if "model_key_seed" in train_config:
+        model_key_seed = train_config["model_key_seed"]
+    else:
         print("No model key seed found, using default", file=sys.stderr)
         model_key_seed = DEFAULT_JAX_SEED
-    else:
-        model_key_seed = int(model_key_seed_str)
-
     model_key = jrd.key(model_key_seed)
 
     array_id_str = os.environ.get("SLURM_ARRAY_TASK_ID", None)
@@ -74,12 +83,12 @@ def handle_seeds() -> tuple[PRNGKeyArray, int, int, int, int | None]:
     else:
         array_id = None
 
-    numpy_seed_str = os.environ.get("FLUMEN_NUMPY_KEY_SEED")
-    if not numpy_seed_str:
+    # numpy_seed_str = os.environ.get("FLUMEN_NUMPY_KEY_SEED")
+    if "numpy_seed" in train_config:
+        numpy_key_seed = train_config["numpy_seed"]
+    else:
         print("No NumPy key seed found, using default", file=sys.stderr)
         numpy_key_seed = DEFAULT_NUMPY_KEY_SEED
-    else:
-        numpy_key_seed = int(numpy_seed_str)
 
     numpy_key = jrd.key(numpy_key_seed)
 
@@ -98,13 +107,20 @@ def main():
 
     ap = ArgumentParser()
     ap.add_argument("load_path", type=str, help="Path to trajectory dataset")
+
+    ap.add_argument(
+        "config_path", type=str, help="Path to YAML train configuration"
+    )
+
     ap.add_argument("name", type=str, nargs="+", help="Name of the experiment.")
+
     ap.add_argument(
         "--model_log_rate",
         type=int,
         default=15,
         help="Model will not be logged to W&B more often than every model_log_rate epochs.",
     )
+
     ap.add_argument("--outdir", type=str, default="./outputs")
 
     args = ap.parse_args()
@@ -115,22 +131,30 @@ def main():
 
     first_name, full_name, timestamp = prepare_model_saving(args.name)
 
+    with open(args.config_path, "r") as f:
+        config: TrainConfig = yaml.load(f, Loader=yaml.FullLoader)
+
     run = wandb.init(
-        project="flumen-jax", config=cast(dict, TRAIN_CONFIG), name=full_name
+        project="flumen-jax",
+        entity="aguiar-kth-royal-institute-of-technology",
+        config=cast(dict, config),
+        name=full_name,
     )
+
     model_save_dir = make_model_dir(
         Path(args.outdir), first_name, full_name + "_" + run.id
     )
     model_name = f"flumen_jax-{timestamp}-{data_path.stem}-{run.id}"
 
     model_key, model_key_seed, numpy_key_seed, numpy_seed, array_id = (
-        handle_seeds()
+        handle_seeds(config)
     )
-    wandb.config["model_key_seed"] = model_key_seed
-    wandb.config["numpy_key_seed"] = numpy_key_seed
-    wandb.config["numpy_seed"] = numpy_key_seed
+    print(model_key_seed)
+    run.config["model_key_seed"] = model_key_seed
+    run.config["numpy_key_seed"] = numpy_key_seed
+    run.config["numpy_seed"] = numpy_key_seed
     if array_id:
-        wandb.config["array_id"] = array_id
+        run.config["array_id"] = array_id
 
     np.random.seed(numpy_seed)
 
@@ -149,8 +173,23 @@ def main():
 
     train_data = DatasetNumPy(DatasetTensor(data["train"]))
     val_data = DatasetNumPy(DatasetTensor(data["val"]))
+    test_data = DatasetNumPy(DatasetTensor(data["test"]))
 
-    bs = TRAIN_CONFIG["batch_size"]
+    for i, test_sample in enumerate(data["val"]):
+        plot_trajectory = 10
+        x0, t, y, u, parameter = test_sample
+        x0_test = np.array(x0)
+        t_test = np.array(t)
+        y_test = np.array(y)
+        u_test = np.array(u)
+        parameter_test = np.array(parameter)
+        delta_test = data["test"].delta
+        skips_test = jnp.floor(t_test / delta_test).astype(jnp.uint32)
+        tau_test = (t_test - delta_test * skips_test) / delta_test
+        if i == plot_trajectory:
+            break
+
+    bs = run.config["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
     val_dl = NumPyLoader(
         val_data, batch_size=bs, shuffle=False, skip_last=False
@@ -161,9 +200,11 @@ def main():
         "control_dim": train_data.control_dim,
         "output_dim": train_data.output_dim,
         "parameter_dim": train_data.parameter_dim,
-        "feature_dim": TRAIN_CONFIG["feature_dim"],
-        "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
-        "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],
+        "feature_dim": run.config["feature_dim"],
+        "encoder_hsz": run.config["encoder_hsz"],
+        "encoder_depth": run.config["encoder_depth"],
+        "decoder_hsz": run.config["decoder_hsz"],
+        "decoder_depth": run.config["decoder_depth"],
         "use_parameter": data["train"].is_parameterised,
     }
 
@@ -189,7 +230,6 @@ def main():
         rtol=run.config["sched_rtol"],
         atol=0.0,
     )
-
     early_stop = MetricMonitor(
         patience=run.config["es_patience"],
         atol=run.config["es_atol"],
@@ -258,6 +298,12 @@ def main():
                 run.log_model(model_save_dir.as_posix(), name=model_name)
                 last_log_epoch = epoch
 
+            y_pred_test = model.eval_trajectory(
+                x0_test, u_test, tau_test, skips_test.squeeze(), parameter_test
+            )
+            fig = plot_prediction(y_test, y_pred_test)
+
+            wandb.log({"prediction": wandb.Image(fig), "best_epoch": epoch + 1})
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss
             run.summary["best_epoch"] = epoch + 1

@@ -72,6 +72,14 @@ def compute_loss(
 
 
 @equinox.filter_jit
+def eval_trajectory(model: Flumen, t, x0, u, delta, parameter=None):
+    skips = jnp.floor(t / delta).astype(jnp.uint32)
+    tau = (t - delta * skips) / delta
+
+    return model.eval_trajectory(x0, u, tau, skips.squeeze(), parameter)
+
+
+@equinox.filter_jit
 def train_step(
     flat_model: PyTree,
     model_treedef: PyTreeDef,

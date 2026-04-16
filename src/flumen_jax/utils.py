@@ -8,13 +8,17 @@ import optax
 from jaxtyping import PRNGKeyArray
 from flumen_jax import Flumen
 from flumen_jax.typing import Output
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class TrainConfig(TypedDict):
     batch_size: int
     feature_dim: int
     encoder_hsz: int
+    encoder_depth: int
     decoder_hsz: int
+    decoder_depth: int
     learning_rate: float
     n_epochs: int
     sched_factor: int
@@ -74,6 +78,34 @@ def make_model_dir(outdir: Path, first_name: str, full_name: str) -> Path:
     return model_save_dir
 
 
+def plot_prediction(y_true, y_pred):
+    """
+    Returns a matplotlib Figure with n_states rows, 1 column each
+    """
+    n_states = y_true.shape[1]
+    fig, axes = plt.subplots(
+        n_states, 1, figsize=(8, 3 * n_states), sharex=True
+    )
+
+    # If only one state, axes is not a list, make it a list for uniformity
+    if n_states == 1:
+        axes = [axes]
+
+    x = np.arange(y_true.shape[0])
+
+    for i in range(n_states):
+        ax = axes[i]
+        ax.plot(x, y_true[:, i], label="y_true", color="blue")
+        ax.plot(x, y_pred[:, i], label="y_pred", color="red")
+        ax.set_ylabel(f"State {i + 1}")
+        ax.grid(True)
+        ax.legend()
+
+    axes[-1].set_xlabel("Time step")
+    plt.tight_layout()
+    return fig
+
+
 @optax.inject_hyperparams
 def adam(learning_rate):
     return optax.adam(learning_rate)
@@ -84,10 +116,12 @@ def make_model(args: dict[str, int], key: PRNGKeyArray) -> Flumen:
         args["state_dim"],
         args["control_dim"],
         args["output_dim"],
-        args["parameter_dim"],
         args["feature_dim"],
         args["encoder_hsz"],
         args["decoder_hsz"],
+        args["encoder_depth"],
+        args["decoder_depth"],
+        args["parameter_dim"],
         args["use_parameter"],
         key=key,
     )

@@ -1,0 +1,17 @@
+batch_size: 1024
+feature_dim: 64
+encoder_hsz: 128
+encoder_depth: 3
+decoder_hsz: 128
+decoder_depth: 3
+learning_rate: 0.0002
+n_epochs: 10000
+sched_factor: 2
+sched_patience: 10
+sched_rtol: 0.0001
+sched_eps: 0.00000001
+es_patience: 300
+es_atol: 0.00005
+init_last_layer_bias: True
+numpy_seed: 31614551
+model_key_seed: 31614551

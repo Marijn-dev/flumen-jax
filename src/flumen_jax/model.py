@@ -7,7 +7,64 @@ from jaxtyping import Array, Float, PRNGKeyArray, Scalar, UInt
 
 from .typing import Input, Output, RNNInput, State, TimeIncrement, Parameter
 
+### use this one for models that dont pass encoder and decoder depth 
+# class Flumen(equinox.Module):
+#     encoder_init_state: MLP
+#     encoder_init_state_parameter: MLP
+#     decoder: MLP
+#     cell: LSTMCell
+#     use_parameter: bool
 
+#     def __init__(
+#         self,
+#         state_dim: int,
+#         control_dim: int,
+#         output_dim: int,
+#         feature_dim: int,
+#         encoder_hsz: int,
+#         decoder_hsz: int,
+#         encoder_depth: int = 4,
+#         decoder_depth: int = 3,
+#         parameter_dim: int = 0,
+#         use_parameter: bool = False,
+#         *,
+#         key: PRNGKeyArray,
+#     ):
+#         enc_key, lstm_key, dec_key = jrd.split(key, 3)
+#         self.use_parameter = use_parameter
+
+#         self.encoder_init_state = MLP(
+#             in_size=state_dim,  # without parameter
+#             out_size=feature_dim,
+#             width_size=encoder_hsz,
+#             depth=encoder_depth,
+#             activation=jnp.tanh,
+#             key=enc_key,
+#         )
+
+#         self.encoder_init_state_parameter = MLP(
+#             in_size=state_dim + parameter_dim,  # with parameter
+#             out_size=feature_dim,
+#             width_size=encoder_hsz,
+#             depth=encoder_depth,
+#             activation=jnp.tanh,
+#             key=enc_key,
+#         )
+
+#         self.cell = LSTMCell(
+#             input_size=control_dim + 1,
+#             hidden_size=feature_dim,
+#             key=lstm_key,
+#         )
+
+#         self.decoder = MLP(
+#             in_size=feature_dim,
+#             out_size=output_dim,
+#             width_size=decoder_hsz,
+#             depth=decoder_depth,
+#             activation=jnp.tanh,
+#             key=dec_key,
+#         )
 class Flumen(equinox.Module):
     encoder_init_state: MLP
     encoder_init_state_parameter: MLP
@@ -20,14 +77,11 @@ class Flumen(equinox.Module):
         state_dim: int,
         control_dim: int,
         output_dim: int,
+        parameter_dim: int,
         feature_dim: int,
         encoder_hsz: int,
         decoder_hsz: int,
-        encoder_depth: int = 3,
-        decoder_depth: int = 3,
-        parameter_dim: int = 0,
-        use_parameter: bool = False,
-        *,
+        use_parameter: bool,
         key: PRNGKeyArray,
     ):
         enc_key, lstm_key, dec_key = jrd.split(key, 3)
@@ -37,7 +91,7 @@ class Flumen(equinox.Module):
             in_size=state_dim,  # without parameter
             out_size=feature_dim,
             width_size=encoder_hsz,
-            depth=encoder_depth,
+            depth=2,
             activation=jnp.tanh,
             key=enc_key,
         )
@@ -46,7 +100,7 @@ class Flumen(equinox.Module):
             in_size=state_dim + parameter_dim,  # with parameter
             out_size=feature_dim,
             width_size=encoder_hsz,
-            depth=encoder_depth,
+            depth=4,
             activation=jnp.tanh,
             key=enc_key,
         )
@@ -61,7 +115,7 @@ class Flumen(equinox.Module):
             in_size=feature_dim,
             out_size=output_dim,
             width_size=decoder_hsz,
-            depth=decoder_depth,
+            depth=3,
             activation=jnp.tanh,
             key=dec_key,
         )

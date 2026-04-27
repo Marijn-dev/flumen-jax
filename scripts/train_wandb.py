@@ -40,6 +40,7 @@ from flumen_jax.utils import (
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
@@ -75,6 +76,8 @@ TRAIN_CONFIG: TrainConfig = {
 >>>>>>> 21458e1 (added trainig config file with de/en coder depth)
 
 >>>>>>> 1de0487 (added online trajectory visualization as input argument)
+=======
+>>>>>>> ef38c13 (changed hyperparameters to yaml file)
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
 
@@ -82,13 +85,6 @@ DEFAULT_NUMPY_KEY_SEED = 3520756
 def handle_seeds(
     train_config,
 ) -> tuple[PRNGKeyArray, int, int, int, int | None]:
-    # model_key_seed_str = os.environ.get("FLUMEN_JAX_SEED")
-    # if not model_key_seed_str:
-    #     print("No model key seed found, using default", file=sys.stderr)
-    #     model_key_seed = DEFAULT_JAX_SEED
-    # else:
-    #     model_key_seed = int(model_key_seed_str)
-
     if "model_key_seed" in train_config:
         model_key_seed = train_config["model_key_seed"]
     else:
@@ -212,6 +208,7 @@ def main():
     test_data = DatasetNumPy(DatasetTensor(data["test"]))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     for i, test_sample in enumerate(data["val"]):
         plot_trajectory = 10
@@ -226,6 +223,23 @@ def main():
         tau_test = (t_test - delta_test * skips_test) / delta_test
         if i == plot_trajectory:
             break
+=======
+    PLOT_TRAJECTORY = False
+    if PLOT_TRAJECTORY:
+        for i, test_sample in enumerate(data["val"]):
+            plot_trajectory = 10
+            x0, t, y, u, parameter = test_sample
+            x0_test = np.array(x0)
+            t_test = np.array(t)
+            y_test = np.array(y)
+            u_test = np.array(u)
+            parameter_test = np.array(parameter)
+            delta_test = data["test"].delta
+            skips_test = jnp.floor(t_test / delta_test).astype(jnp.uint32)
+            tau_test = (t_test - delta_test * skips_test) / delta_test
+            if i == plot_trajectory:
+                break
+>>>>>>> ef38c13 (changed hyperparameters to yaml file)
 
 >>>>>>> 21458e1 (added trainig config file with de/en coder depth)
     bs = run.config["batch_size"]
@@ -359,6 +373,7 @@ def main():
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             if args.trajectory_visualization:
                 trajectory_nr = 0  # the trajectory to visualize
                 delta = data["settings"]["control_delta"]
@@ -385,6 +400,21 @@ def main():
 
             wandb.log({"prediction": wandb.Image(fig), "best_epoch": epoch + 1})
 >>>>>>> 21458e1 (added trainig config file with de/en coder depth)
+=======
+            if PLOT_TRAJECTORY:
+                y_pred_test = model.eval_trajectory(
+                    x0_test,
+                    u_test,
+                    tau_test,
+                    skips_test.squeeze(),
+                    parameter_test,
+                )
+                fig = plot_prediction(y_test, y_pred_test)
+
+                wandb.log(
+                    {"prediction": wandb.Image(fig), "best_epoch": epoch + 1}
+                )
+>>>>>>> ef38c13 (changed hyperparameters to yaml file)
             run.summary["best_train"] = train_loss
             run.summary["best_val"] = val_loss
             run.summary["best_epoch"] = epoch + 1

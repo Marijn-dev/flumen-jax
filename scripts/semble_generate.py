@@ -199,12 +199,12 @@ def generate(args, trajectory_sampler: TrajectorySampler, postprocess=[]):
                 "control": u,
             }
 
-    train_data_ = [get_example() for _ in range(n_train)]
-    trajectory_sampler.reset_rngs()
+    train_data = [get_example() for _ in range(n_train)]
 
+    trajectory_sampler.reset_rngs()
     val_data = [get_example() for _ in range(n_val)]
-    trajectory_sampler.reset_rngs()
 
+    trajectory_sampler.reset_rngs()
     test_data = [get_example() for _ in range(n_test)]
 
     DatasetMapping = {
@@ -215,7 +215,7 @@ def generate(args, trajectory_sampler: TrajectorySampler, postprocess=[]):
     RawDataset = DatasetMapping[trajectory_sampler._dyn._is_parameterised]
 
     train_data = RawDataset(
-        train_data_,
+        train_data,
         trajectory_sampler.dims(),
         delta=trajectory_sampler._delta,
         output_mask=trajectory_sampler._dyn.mask,

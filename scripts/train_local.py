@@ -37,15 +37,9 @@ TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
     "feature_dim": 16,
     "encoder_hsz": 16,
-<<<<<<< HEAD
-    "encoder_depth": 2,
-    "decoder_hsz": 16,
-    "decoder_depth": 2,
-=======
     "encoder_depth": 3,
     "decoder_hsz": 16,
     "decoder_depth": 3,
->>>>>>> 3e63315 (train_local: {en,de}coder depth required in config)
     "learning_rate": 1e-3,
     "n_epochs": 500,
     "sched_factor": 2,
@@ -108,10 +102,7 @@ def main():
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],
         "encoder_depth": TRAIN_CONFIG["encoder_depth"],
         "decoder_depth": TRAIN_CONFIG["decoder_depth"],
-<<<<<<< HEAD
-=======
         "use_parameter": data["train"].is_parameterised,
->>>>>>> 3e63315 (train_local: {en,de}coder depth required in config)
     }
 
     model_metadata = {

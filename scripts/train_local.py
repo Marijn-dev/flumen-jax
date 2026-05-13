@@ -1,19 +1,10 @@
-import pickle
-import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from time import time
-
-import equinox
-import jax
-import numpy as np
-import yaml
-from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
-
+from flumen import TrajectoryDataset
 from flumen_jax.dataloader import (
     NumPyDataset,
-    ParameterisedNumPyDataset,
     NumPyLoader,
 )
 from flumen_jax.train import (
@@ -32,6 +23,13 @@ from flumen_jax.utils import (
     print_losses,
     init_last_layer_bias,
 )
+
+import pickle
+import sys
+import equinox
+import jax
+import numpy as np
+import yaml
 
 TRAIN_CONFIG: TrainConfig = {
     "batch_size": 128,
@@ -70,21 +68,8 @@ def main():
     with data_path.open("rb") as f:
         data = pickle.load(f)
 
-    DatasetMappingTensor = {
-        True: ParameterisedTrajectoryDataset,
-        False: TrajectoryDataset,
-    }
-
-    DatasetMappingNumPy = {
-        True: ParameterisedNumPyDataset,
-        False: NumPyDataset,
-    }
-
-    DatasetTensor = DatasetMappingTensor[data["train"].is_parameterised]
-    DatasetNumPy = DatasetMappingNumPy[data["train"].is_parameterised]
-
-    train_data = DatasetNumPy(DatasetTensor(data["train"]))
-    val_data = DatasetNumPy(DatasetTensor(data["val"]))
+    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
+    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
 
     bs = TRAIN_CONFIG["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
@@ -96,13 +81,11 @@ def main():
         "state_dim": train_data.state_dim,
         "control_dim": train_data.control_dim,
         "output_dim": train_data.output_dim,
-        "parameter_dim": train_data.parameter_dim,
         "feature_dim": TRAIN_CONFIG["feature_dim"],
         "encoder_hsz": TRAIN_CONFIG["encoder_hsz"],
         "decoder_hsz": TRAIN_CONFIG["decoder_hsz"],
         "encoder_depth": TRAIN_CONFIG["encoder_depth"],
         "decoder_depth": TRAIN_CONFIG["decoder_depth"],
-        "use_parameter": data["train"].is_parameterised,
     }
 
     model_metadata = {
@@ -211,7 +194,7 @@ def main():
         model_save_dir / "leaves.eqx", model
     )
 
-    test_data = DatasetNumPy(DatasetTensor(data["test"]))
+    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
     test_dl = NumPyLoader(
         test_data, batch_size=bs, shuffle=False, skip_last=False
     )

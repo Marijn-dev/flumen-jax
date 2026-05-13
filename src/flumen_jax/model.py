@@ -1,19 +1,17 @@
-import equinox
-import jax
 from equinox.nn import MLP, LSTMCell
 from jax import numpy as jnp
 from jax import random as jrd
 from jaxtyping import Array, Float, PRNGKeyArray, Scalar, UInt
+from .typing import Input, Output, RNNInput, State, TimeIncrement
 
-from .typing import Input, Output, RNNInput, State, TimeIncrement, Parameter
+import equinox
+import jax
 
-### use this one for models that dont pass encoder and decoder depth 
+
 class Flumen(equinox.Module):
     encoder_init_state: MLP
-    encoder_init_state_parameter: MLP
     decoder: MLP
     cell: LSTMCell
-    use_parameter: bool
 
     def __init__(
         self,
@@ -25,25 +23,13 @@ class Flumen(equinox.Module):
         decoder_hsz: int,
         encoder_depth: int = 4,
         decoder_depth: int = 3,
-        parameter_dim: int = 0,
-        use_parameter: bool = False,
         *,
         key: PRNGKeyArray,
     ):
         enc_key, lstm_key, dec_key = jrd.split(key, 3)
-        self.use_parameter = use_parameter
 
         self.encoder_init_state = MLP(
-            in_size=state_dim,  # without parameter
-            out_size=feature_dim,
-            width_size=encoder_hsz,
-            depth=encoder_depth,
-            activation=jnp.tanh,
-            key=enc_key,
-        )
-
-        self.encoder_init_state_parameter = MLP(
-            in_size=state_dim + parameter_dim,  # with parameter
+            in_size=state_dim,
             out_size=feature_dim,
             width_size=encoder_hsz,
             depth=encoder_depth,
@@ -65,60 +51,6 @@ class Flumen(equinox.Module):
             activation=jnp.tanh,
             key=dec_key,
         )
-# class Flumen(equinox.Module):
-#     encoder_init_state: MLP
-#     encoder_init_state_parameter: MLP
-#     decoder: MLP
-#     cell: LSTMCell
-#     use_parameter: bool
-
-#     def __init__(
-#         self,
-#         state_dim: int,
-#         control_dim: int,
-#         output_dim: int,
-#         parameter_dim: int,
-#         feature_dim: int,
-#         encoder_hsz: int,
-#         decoder_hsz: int,
-#         use_parameter: bool,
-#         key: PRNGKeyArray,
-#     ):
-#         enc_key, lstm_key, dec_key = jrd.split(key, 3)
-#         self.use_parameter = use_parameter
-
-#         self.encoder_init_state = MLP(
-#             in_size=state_dim,  # without parameter
-#             out_size=feature_dim,
-#             width_size=encoder_hsz,
-#             depth=2,
-#             activation=jnp.tanh,
-#             key=enc_key,
-#         )
-
-#         self.encoder_init_state_parameter = MLP(
-#             in_size=state_dim + parameter_dim,  # with parameter
-#             out_size=feature_dim,
-#             width_size=encoder_hsz,
-#             depth=4,
-#             activation=jnp.tanh,
-#             key=enc_key,
-#         )
-
-#         self.cell = LSTMCell(
-#             input_size=control_dim + 1,
-#             hidden_size=feature_dim,
-#             key=lstm_key,
-#         )
-
-#         self.decoder = MLP(
-#             in_size=feature_dim,
-#             out_size=output_dim,
-#             width_size=decoder_hsz,
-#             depth=3,
-#             activation=jnp.tanh,
-#             key=dec_key,
-#         )
 
     def __call__(
         self,
@@ -126,14 +58,9 @@ class Flumen(equinox.Module):
         rnn_input: RNNInput,
         tau: TimeIncrement,
         len: UInt[Scalar, ""],
-        parameter: Parameter | None = None,
     ) -> Output:
-        if self.use_parameter:
-            h = self.encoder_init_state_parameter(
-                jnp.concatenate([initial_state, parameter], axis=0)
-            )
-        else:
-            h = self.encoder_init_state(initial_state)
+
+        h = self.encoder_init_state(initial_state)
         c = jnp.zeros_like(h)
 
         (h_last, _), h_seq = jax.lax.scan(
@@ -153,14 +80,9 @@ class Flumen(equinox.Module):
         u: Input,
         tau: Float[Array, "n_time_pts 1"],
         skips: UInt[Array, "n_time_pts"],  # noqa: F821
-        parameter: Parameter | None = None,
     ) -> Float[Array, "n_time_pts output_dim"]:
-        if self.use_parameter:
-            h = self.encoder_init_state_parameter(
-                jnp.concatenate([initial_state, parameter], axis=0)
-            )
-        else:
-            h = self.encoder_init_state(initial_state)
+
+        h = self.encoder_init_state(initial_state)
         c = jnp.zeros_like(h)
 
         rnn_input_integer_steps = jnp.concatenate(

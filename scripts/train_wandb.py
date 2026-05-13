@@ -1,23 +1,12 @@
-import os
-import pickle
-import sys
 from argparse import ArgumentParser
 from pathlib import Path
 from time import time
 from typing import cast
-
-import equinox
-import jax
-import numpy as np
-import jax.numpy as jnp
-import yaml
-from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
 from jax import random as jrd
 from jaxtyping import PRNGKeyArray
-import wandb
+from flumen import TrajectoryDataset
 from flumen_jax.dataloader import (
     NumPyDataset,
-    ParameterisedNumPyDataset,
     NumPyLoader,
 )
 from flumen_jax.train import (
@@ -35,8 +24,16 @@ from flumen_jax.utils import (
     prepare_model_saving,
     print_header,
     print_losses,
-    plot_prediction,
 )
+
+import os
+import pickle
+import sys
+import equinox
+import jax
+import numpy as np
+import yaml
+import wandb
 
 DEFAULT_JAX_SEED = 0
 DEFAULT_NUMPY_KEY_SEED = 3520756
@@ -131,23 +128,8 @@ def main():
 
     np.random.seed(numpy_seed)
 
-    DatasetMappingTensor = {
-        True: ParameterisedTrajectoryDataset,
-        False: TrajectoryDataset,
-    }
-
-    DatasetMappingNumPy = {
-        True: ParameterisedNumPyDataset,
-        False: NumPyDataset,
-    }
-
-    DatasetTensor = DatasetMappingTensor[data["train"].is_parameterised]
-    DatasetNumPy = DatasetMappingNumPy[data["train"].is_parameterised]
-
-    train_data = DatasetNumPy(DatasetTensor(data["train"]))
-    val_data = DatasetNumPy(DatasetTensor(data["val"]))
-    test_data = DatasetNumPy(DatasetTensor(data["test"]))
-
+    train_data = NumPyDataset(TrajectoryDataset(data["train"]))
+    val_data = NumPyDataset(TrajectoryDataset(data["val"]))
 
     bs = run.config["batch_size"]
     train_dl = NumPyLoader(train_data, batch_size=bs, shuffle=True)
@@ -159,13 +141,11 @@ def main():
         "state_dim": train_data.state_dim,
         "control_dim": train_data.control_dim,
         "output_dim": train_data.output_dim,
-        "parameter_dim": train_data.parameter_dim,
         "feature_dim": run.config["feature_dim"],
         "encoder_hsz": run.config["encoder_hsz"],
         "encoder_depth": run.config["encoder_depth"],
         "decoder_hsz": run.config["decoder_hsz"],
         "decoder_depth": run.config["decoder_depth"],
-        "use_parameter": data["train"].is_parameterised,
     }
 
     model_metadata = {
@@ -297,7 +277,7 @@ def main():
     )
     flat_model, model_treedef = jax.tree_util.tree_flatten(model)
 
-    test_data = DatasetNumPy(DatasetTensor(data["test"]))
+    test_data = NumPyDataset(TrajectoryDataset(data["test"]))
     test_dl = NumPyLoader(
         test_data, batch_size=bs, shuffle=False, skip_last=False
     )

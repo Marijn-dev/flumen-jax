@@ -1,11 +1,10 @@
 from typing import Iterator
+from jaxtyping import Array, Float, UInt
+from .typing import BatchedOutput, Inputs
+from flumen import TrajectoryDataset
 
 import jax
 import numpy as np
-from flumen import TrajectoryDataset, ParameterisedTrajectoryDataset
-from jaxtyping import Array, Float, UInt
-
-from .typing import BatchedOutput, Inputs
 
 
 class NumPyDataset:
@@ -41,7 +40,6 @@ class NumPyDataset:
         self.state_dim = data.state_dim
         self.output_dim = data.output_dim
         self.control_dim = data.control_dim
-        self.parameter_dim = data.parameter_dim
 
     def __getitem__(self, index) -> tuple[BatchedOutput, Inputs]:
         return (
@@ -58,21 +56,8 @@ class NumPyDataset:
         return self.y.shape[0]
 
 
-class ParameterisedNumPyDataset(NumPyDataset):
-    parameter: Float[Array, "dlen parameter_dim"]
-
-    def __init__(self, data: ParameterisedTrajectoryDataset):
-        super().__init__(data)
-
-        self.parameter = jax.tree_map(np.asarray, data.parameter)
-
-    def __getitem__(self, index):
-        y, inputs = super().__getitem__(index)
-        return y, (*inputs, self.parameter[index])
-
-
 def dataloader(
-    data: NumPyDataset | ParameterisedNumPyDataset,
+    data: NumPyDataset,
     batch_size,
     shuffle,
     skip_last,
@@ -95,7 +80,7 @@ def dataloader(
 class NumPyLoader:
     def __init__(
         self,
-        data: NumPyDataset | ParameterisedNumPyDataset,
+        data: NumPyDataset,
         batch_size: int,
         shuffle=True,
         skip_last=True,

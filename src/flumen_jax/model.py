@@ -58,8 +58,12 @@ class Flumen(equinox.Module):
         rnn_input: RNNInput,
         tau: TimeIncrement,
         len: UInt[Scalar, ""],
+        params=jnp.empty((0,)),
     ) -> Output:
 
+        # initial_state can contain of x0 and params (params is not passed to the call)
+        # or of only x0 (params is passed to the call)
+        initial_state = jnp.concatenate([initial_state, params], axis=0)
         h = self.encoder_init_state(initial_state)
         c = jnp.zeros_like(h)
 
@@ -80,8 +84,10 @@ class Flumen(equinox.Module):
         u: Input,
         tau: Float[Array, "n_time_pts 1"],
         skips: UInt[Array, "n_time_pts"],  # noqa: F821
+        params=jnp.empty((0,)),
     ) -> Float[Array, "n_time_pts output_dim"]:
 
+        initial_state = jnp.concatenate([initial_state, params], axis=0)
         h = self.encoder_init_state(initial_state)
         c = jnp.zeros_like(h)
 
